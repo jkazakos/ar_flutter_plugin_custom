@@ -20,6 +20,7 @@ import com.google.ar.sceneform.math.Vector3
 import com.google.ar.sceneform.ux.*
 import io.carius.lars.ar_flutter_plugin.Serialization.deserializeMatrix4
 import io.carius.lars.ar_flutter_plugin.Serialization.serializeAnchor
+import io.carius.lars.ar_flutter_plugin.Serialization.serializeGeospatialAnchor
 import io.carius.lars.ar_flutter_plugin.Serialization.serializeHitResult
 import io.carius.lars.ar_flutter_plugin.Serialization.serializePose
 import io.flutter.FlutterInjector
@@ -32,6 +33,7 @@ import java.io.ByteArrayOutputStream
 import java.io.IOException
 import java.nio.FloatBuffer
 import java.util.concurrent.CompletableFuture
+import java.util.UUID
 
 import android.R
 import com.google.ar.sceneform.rendering.*
@@ -82,6 +84,8 @@ internal class AndroidARView(
     private lateinit var sceneUpdateListener: com.google.ar.sceneform.Scene.OnUpdateListener
     private lateinit var onNodeTapListener: com.google.ar.sceneform.Scene.OnPeekTouchListener
 
+    private val anchorMap: MutableMap<String, Anchor> = mutableMapOf()
+
     // Method channel handlers
     private val onSessionMethodCall =
             object : MethodChannel.MethodCallHandler {
@@ -106,6 +110,92 @@ internal class AndroidARView(
                             } else {
                                 result.error("Error", "could not get camera pose", null)
                             }
+                        }
+                        "placeGeospatial" -> {
+                            Log.d("GeoAnchor", "placeGeospatial called")
+                            val latitude: Double? = call.argument<Double>("latitude")
+                            val longitude: Double? = call.argument<Double>("longitude")
+                            val altitudeAboveTerrain: Double? = call.argument<Double>("altitude")
+                            val name: String? = call.argument<String>("name")
+                            val cloudanchorid: String? = call.argument<String>("cloudanchorid")
+                            val qx = call.argument<Double>("qx")
+                            val qy = call.argument<Double>("qy")
+                            val qz = call.argument<Double>("qz")
+                            val qw = call.argument<Double>("qw")
+
+                            if (latitude == null || longitude == null || altitudeAboveTerrain == null || name == null || qx == null || qy == null || qz == null || qw == null) {
+                                Log.w("GeoAnchor", "Missing lat, long, alt, name or quaternion arguments.")
+                                result.error("Error", "Missing arguments for geospatial anchor.", null)
+                                return
+                            }
+
+                            Log.d("GeoAnchor", "Received arguments: lat=$latitude, lon=$longitude, alt=$altitudeAboveTerrain, name=$name, qx=$qx, qy=$qy, qz=$qz, qw=$qw")
+
+                            val anchor = addGeospatialAnchor(latitude, longitude, altitudeAboveTerrain, qx, qy, qz, qw)
+
+                            if (anchor == null) {
+                                Log.e("GeoAnchor", "❌ Failed to create geospatial anchor.")
+                                result.error("Error", "Failed to create geospatial anchor.", null)
+                                return
+                            }
+
+                            // Store the anchor in the map
+                            anchorMap[name!!] = anchor
+
+                            Log.d("GeoAnchor", "✅ Geospatial anchor created successfully.")
+
+                            // Create AnchorNode
+                            val anchorNode = AnchorNode(anchor)
+                            anchorNode.name = name
+                            // Add it to the scene
+                            arSceneView.scene.addChild(anchorNode)
+
+                            if (anchorNode == null || anchor == null) {
+                                Log.e("GeoAnchor", "❌ Failed to find anchorNode just created.")
+                                result.error("Error", "Anchor created but not found in scene.", null)
+                                return
+                            }
+
+                            Log.d("GeoAnchor", "✅ Node placed and stored with name: $name")
+
+                            val serialized = serializeGeospatialAnchor(
+                                anchor,
+                                anchorNode,
+                                name,
+                                latitude,
+                                longitude,
+                                altitudeAboveTerrain,
+                                cloudanchorid,
+                                qx.toFloat(), qy.toFloat(), qz.toFloat(), qw.toFloat()
+                            )
+                            Log.d("GeoAnchor", "Sending serialized anchor data: $serialized")
+                            result.success(serialized)
+                            Log.i("GeoAnchor", "placeGeospatial exited successfully.")
+                        }
+                        "checkEarthTracking" -> {
+                            Log.d("GeoAnchor", "checkEarthTracking called")
+                            val session = arSceneView.session
+                            if (session == null) {
+                                result.error("SESSION_NOT_INITIALIZED", "AR session is not initialized.", null)
+                                return
+                            }
+                            val earth = session.earth
+                            if (earth == null) {
+                                result.error("EARTH_NOT_INITIALIZED", "Earth object is not initialized.", null)
+                                return
+                            }
+                            Log.d("GeoAnchor", "AR session: $session")
+                            Log.d("GeoAnchor", "Earth object: $earth")
+                            Log.d("GeoAnchor", "Earth tracking state: ${earth?.trackingState}")
+                            Log.d("GeoAnchor", "Earth state: ${earth.earthState}")
+                            Log.d("GeoAnchor", "Earth pose: ${earth?.cameraGeospatialPose}")
+
+                            // Create a map to send back all the relevant information
+                            val resultMap = HashMap<String, String>()
+                            resultMap["trackingState"] = earth.trackingState.name // Convert enum to string
+                            resultMap["earthState"] = earth.earthState.name       // Convert enum to string
+
+                            result.success(resultMap) // Send the map back
                         }
                         "placeBasedOnCoordinates" -> {
                             if (call.arguments is Map<*,*>) {
@@ -200,7 +290,22 @@ internal class AndroidARView(
                             } else {
                                 result.success(false)
                             }
-
+                        }
+                        "addNodeToGeospatialAnchor" -> {
+                            Log.d("GeoAnchor", "addNodeToGeospatialAnchor was called")
+                            val dict_node: HashMap<String, Any>? = call.argument<HashMap<String, Any>>("node")
+                            val dict_anchor: HashMap<String, Any>? = call.argument<HashMap<String, Any>>("anchor")
+                            if (dict_node != null && dict_anchor != null) {
+                                addNode(dict_node, dict_anchor).thenAccept{status: Boolean ->
+                                    result.success(status)
+                                }.exceptionally { throwable ->
+                                    result.error("e", throwable.message, throwable.stackTrace)
+                                    null
+                                }
+                            } else {
+                                Log.e("GeoAnchor", "dict_node or dict_anchor is null")
+                                result.success(false)
+                            }
                         }
                         "removeNode" -> {
                             val nodeName: String? = call.argument<String>("name")
@@ -248,6 +353,36 @@ internal class AndroidARView(
                                         }
 
                                     }
+                                    1 -> { // Geospatial Anchor
+                                        // Method currently not called from Flutter
+                                        Log.i("GeoAnchor", "addAnchor called for Geospatial Anchor")
+                                        val latitude: Double? = call.argument<Double>("latitude")
+                                        val longitude: Double? = call.argument<Double>("longitude")
+                                        val altitudeAboveTerrain: Double? = call.argument<Double>("altitude")
+                                        val name: String? = call.argument<String>("name")
+                                        val cloudanchorid: String? = call.argument<String>("cloudanchorid")
+                                        val qx = call.argument<Double>("qx")
+                                        val qy = call.argument<Double>("qy")
+                                        val qz = call.argument<Double>("qz")
+                                        val qw = call.argument<Double>("qw")
+
+                                        if (latitude == null || longitude == null || altitudeAboveTerrain == null || name == null || qx == null || qy == null || qz == null || qw == null) {
+                                            Log.w("GeoAnchor", "Missing lat, long, alt, name or quaternion arguments.")
+                                            result.error("Error", "Missing arguments for geospatial anchor.", null)
+                                            return
+                                        }
+                                        val newAnchor = addGeospatialAnchor(
+                                            latitude,
+                                            longitude,
+                                            altitudeAboveTerrain,
+                                            qx.toDouble(),
+                                            qy.toDouble(),
+                                            qz.toDouble(),
+                                            qw.toDouble()
+                                        )
+
+
+                                    }
                                     else -> result.success(false)
                                 }
                             } else {
@@ -277,6 +412,7 @@ internal class AndroidARView(
                             if (arSceneView.session != null) {
                                 val config = Config(arSceneView.session)
                                 config.cloudAnchorMode = Config.CloudAnchorMode.ENABLED
+                                config.geospatialMode = Config.GeospatialMode.ENABLED
                                 config.updateMode = Config.UpdateMode.LATEST_CAMERA_IMAGE
                                 config.focusMode = Config.FocusMode.AUTO
                                 arSceneView.session?.configure(config)
@@ -426,6 +562,11 @@ internal class AndroidARView(
                     val config = Config(session)
                     config.updateMode = Config.UpdateMode.LATEST_CAMERA_IMAGE
                     config.focusMode = Config.FocusMode.AUTO
+                    // Enable Geospatial mode here
+                    config.geospatialMode = Config.GeospatialMode.ENABLED
+                    // Optional: Enabling cloud anchors if needed
+                    // config.cloudAnchorMode = Config.CloudAnchorMode.ENABLED
+
                     session.configure(config)
                     arSceneView.setupSession(session)
                 }
@@ -885,6 +1026,47 @@ internal class AndroidARView(
             true
         } catch (e: Exception) {
             false
+        }
+    }
+
+    private fun addGeospatialAnchor(
+        latitude: Double,
+        longitude: Double,
+        altitude: Double,
+        qx: Double,
+        qy: Double,
+        qz: Double,
+        qw: Double
+    ): Anchor? {
+        Log.d("GeoAnchor", "addGeospatialAnchor called with lat: $latitude, lon: $longitude, alt: $altitude, qx: $qx, qy: $qy, qz: $qz, qw: $qw")
+        return try {
+            val earth = arSceneView.session?.earth
+            if (earth?.trackingState != TrackingState.TRACKING) {
+                Log.w("GeoAnchor", "Earth not tracking — cannot create anchor")
+                return null
+            }
+
+            val cameraPose = earth.cameraGeospatialPose
+            if (cameraPose != null) {
+                val currentAltitude = cameraPose.altitude
+                Log.d("GeoAnchor", "Camera WGS84 Altitude: $currentAltitude")
+                Log.d("GeoAnchor", "Requested Anchor Altitude: $altitude")
+                Log.d("GeoAnchor", "Altitude Difference: ${altitude - currentAltitude}")
+            }
+
+            earth?.createAnchor(
+                latitude,
+                longitude,
+                altitude,
+                qx.toFloat(),
+                qy.toFloat(),
+                qz.toFloat(),
+                qw.toFloat()
+            )
+
+        } catch (e: Exception) {
+            Log.e("GeoAnchor", "Error adding geospatial anchor: ${e.message}", e)
+            null
         }
     }
 

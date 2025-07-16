@@ -281,7 +281,7 @@ class _ExternalModelManagementWidgetState
             rotation: VectorMath.Vector4(1.0, 0.0, 0.0, 0.0),
             data: {"onTapText": "I am a " + this.selectedModel.name});
         bool? didAddNodeToAnchor =
-            await this.arObjectManager!.addNode(newNode, planeAnchor: newAnchor);
+            await this.arObjectManager!.addNode(newNode, anchor: newAnchor);
         if (didAddNodeToAnchor!) {
           this.nodes.add(newNode);
           setState(() {
@@ -328,7 +328,7 @@ class _ExternalModelManagementWidgetState
     firebaseManager.getObjectsFromAnchor(anchor, (snapshot) {
       snapshot.docs.forEach((objectDoc) {
         ARNode object = ARNode.fromMap(objectDoc.data() as Map<String, dynamic>);
-        arObjectManager!.addNode(object, planeAnchor: anchor);
+        arObjectManager!.addNode(object, anchor: anchor);
         this.nodes.add(object);
       });
     });

@@ -251,7 +251,7 @@ class _CloudAnchorWidgetState extends State<CloudAnchorWidget> {
             rotation: Vector4(1.0, 0.0, 0.0, 0.0),
             data: {"onTapText": "Ouch, that hurt!"});
         bool? didAddNodeToAnchor =
-            await this.arObjectManager!.addNode(newNode, planeAnchor: newAnchor);
+            await this.arObjectManager!.addNode(newNode,anchor: newAnchor);
         if (didAddNodeToAnchor ?? false) {
           this.nodes.add(newNode);
           setState(() {
@@ -298,7 +298,7 @@ class _CloudAnchorWidgetState extends State<CloudAnchorWidget> {
     firebaseManager.getObjectsFromAnchor(anchor, (snapshot) {
       snapshot.docs.forEach((objectDoc) {
         ARNode object = ARNode.fromMap(objectDoc.data() as Map<String, dynamic>);
-        arObjectManager!.addNode(object, planeAnchor: anchor);
+        arObjectManager!.addNode(object, anchor: anchor);
         this.nodes.add(object);
       });
     });

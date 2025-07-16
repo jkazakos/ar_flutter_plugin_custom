@@ -8,6 +8,8 @@ import 'package:ar_flutter_plugin/utils/json_converters.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:vector_math/vector_math_64.dart';
+import 'dart:async';
+import 'package:flutter/foundation.dart';
 
 // Type definitions to enforce a consistent use of the API
 typedef ARHitResultHandler = void Function(List<ARHitTestResult> hits);
@@ -59,19 +61,34 @@ class ARSessionManager {
   }
 
   /// Places anchor in lat-lon-alt coordinates using GeoSpatial API
-  Future placeGeospatial(double lat, double lon, double alt, String name) async {
+  Future placeGeospatial(double? lat, double? lon, double? alt, String name, double qx, double qy, double qz, double qw) async {
+    print("Calling placeGeospatial with lat: $lat, lon: $lon, alt: $alt, name: $name, qx: $qx, qy: $qy, qz: $qz, qw: $qw");
+    // if (lat ==null || lon == null || alt == null) {
+    //   print("❌ Error: Latitude, Longitude, and Altitude must not be null.");
+    //   return null;
+    // }
     try {
       var result = await _channel.invokeMethod('placeGeospatial', {
-        "lat": lat,
-        "lon": lon,
-        "alt": alt,
+        "latitude": lat,
+        "longitude": lon,
+        "altitude": alt,
         "name": name,
+        "qx": qx,
+        "qy": qy,
+        "qz": qz,
+        "qw": qw,
       });
 
-      var anchor = ARAnchor.fromJson(result);
-      return anchor;
-    } catch (e) {
-      print('Error caught: ' + e.toString());
+      // Debug output
+      print("Raw result from Kotlin: $result");
+
+      var serializedAnchor = ARAnchor.fromJson(result);
+      print('✅ Successfully deserialized anchor: $serializedAnchor');
+
+      return serializedAnchor;
+    } catch (e, stack) {
+      print('❌ Error caught: $e');
+      print('📌 Stack trace: $stack');
       return null;
     }
   }
@@ -212,5 +229,24 @@ class ARSessionManager {
   Future<ImageProvider> snapshot() async {
     final result = await _channel.invokeMethod<Uint8List>('snapshot');
     return MemoryImage(result!);
+  }
+
+  /// NEW METHOD: Query the current Earth tracking state from the AR session
+  Future<Map<String, String>> checkEarthTracking() async {
+    try {
+      final Map<dynamic, dynamic>? resultMap = await _channel.invokeMethod('checkEarthTracking');
+
+      if (resultMap == null) {
+        throw Exception("No result returned from checkEarthTracking");
+      }
+
+      return resultMap.map((key, value) => MapEntry(key.toString(), value.toString()));
+    } catch (e) {
+      debugPrint("Error checking Earth status: $e");
+      return {
+        "trackingState": "ERROR",
+        "earthState": "ERROR",
+      };
+    }
   }
 }

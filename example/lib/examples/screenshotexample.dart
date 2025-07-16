@@ -131,7 +131,7 @@ class _ScreenshotWidgetState extends State<ScreenshotWidget> {
             position: Vector3(0.0, 0.0, 0.0),
             rotation: Vector4(1.0, 0.0, 0.0, 0.0));
         bool? didAddNodeToAnchor =
-            await arObjectManager!.addNode(newNode, planeAnchor: newAnchor);
+            await arObjectManager!.addNode(newNode, anchor: newAnchor);
         
         if (didAddNodeToAnchor != null && didAddNodeToAnchor) {
           nodes.add(newNode);

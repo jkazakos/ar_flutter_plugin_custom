@@ -7,6 +7,8 @@ import com.google.ar.sceneform.math.Quaternion
 import com.google.ar.sceneform.math.Vector3
 import com.google.ar.sceneform.ux.BaseTransformableNode
 import com.google.ar.sceneform.ux.TransformableNode
+import java.lang.reflect.Method
+import java.util.HashMap
 
 fun serializeHitResult(hitResult: HitResult): HashMap<String, Any> {
     val serializedHitResult = HashMap<String,Any>()
@@ -77,4 +79,45 @@ fun serializeLocalTransformation(node: BaseTransformableNode): HashMap<String, A
     serializedLocalTransformation["transform"] = serializePoseWithScale(transform, node.localScale)
 
     return serializedLocalTransformation
+}
+
+fun serializeGeospatialAnchor(
+    anchor: Anchor,
+    anchorNode: AnchorNode,
+    name: String?,
+    latitude: Double,
+    longitude: Double,
+    altitude: Double,
+    cloudAnchorId: String?,
+    qx: Float,
+    qy: Float,
+    qz: Float,
+    qw: Float
+): HashMap<String, Any?> {
+    val serializedAnchor = HashMap<String, Any?>()
+
+    serializedAnchor["type"] = 1 // index for geospatial anchors
+    serializedAnchor["name"] = name
+    serializedAnchor["cloudanchorid"] = anchor?.cloudAnchorId
+    serializedAnchor["transformation"] = serializePoseAsList(anchor.pose)
+
+    serializedAnchor["latitude"] = latitude
+    serializedAnchor["longitude"] = longitude
+    serializedAnchor["altitude"] = altitude
+
+    serializedAnchor["qx"] = qx
+    serializedAnchor["qy"] = qy
+    serializedAnchor["qz"] = qz
+    serializedAnchor["qw"] = qw
+
+    serializedAnchor["childNodes"] = anchorNode.children.map { child -> child.name }
+
+    return serializedAnchor
+}
+
+fun serializePoseAsList(pose: Pose): List<Double> {
+    val matrix = FloatArray(16)
+    pose.toMatrix(matrix, 0)
+    // copy into double Array
+    return matrix.map { it.toDouble() }
 }
