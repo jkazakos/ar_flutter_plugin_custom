@@ -1,55 +1,68 @@
 package io.carius.lars.ar_flutter_plugin
 
+import android.util.Log
 import com.google.ar.core.Anchor
 import com.google.ar.core.Anchor.CloudAnchorState
 import com.google.ar.core.Session
 import java.util.*
+import java.util.function.BiConsumer
+import kotlin.collections.set
 
 // Class for handling logic regarding the Google Cloud Anchor API
-internal class CloudAnchorHandler( arSession: Session ) {
+internal class CloudAnchorHandler(arSession: Session) {
 
-    // Listener that can be attached to hosing or resolving processes
+    // Listener that can be attached to hosting or resolving processes
     interface CloudAnchorListener {
         // Callback to invoke when cloud anchor task finishes
-        fun onCloudTaskComplete(anchorName: String?, anchor: Anchor?)
+        fun onCloudTaskComplete(anchorName: String?, anchor: Anchor?, state: CloudAnchorState, cloudAnchorId: String)
     }
 
     private val TAG: String = CloudAnchorHandler::class.java.simpleName
-    val pendingAnchors = HashMap<Anchor, Pair<String?, CloudAnchorListener?>>()
     private val session: Session = arSession
 
     @Synchronized
     fun hostCloudAnchor(anchorName: String, anchor: Anchor?, listener: CloudAnchorListener?) {
-        val newAnchor = session.hostCloudAnchor(anchor)
-        // Register listener so it is invoked when the operation finishes
-        pendingAnchors[newAnchor] = Pair(anchorName, listener)
+        if (anchor == null) return
+        val callback = BiConsumer<String, CloudAnchorState> { cloudAnchorId, state ->
+            if (state == CloudAnchorState.SUCCESS) {
+                listener!!.onCloudTaskComplete(anchorName, anchor, state, cloudAnchorId)
+            }
+        }
+        session.hostCloudAnchorAsync(anchor, /* ttlDays = */ 1, callback)
     }
 
     @Synchronized
-    fun hostCloudAnchorWithTtl(anchorName: String, anchor: Anchor?, listener: CloudAnchorListener?, ttl: Int) {
-        val newAnchor = session.hostCloudAnchorWithTtl(anchor, ttl)
-        // Register listener so it is invoked when the operation finishes
-        pendingAnchors[newAnchor] = Pair(anchorName, listener)
+    fun hostCloudAnchorWithTtl(
+        anchorName: String,
+        anchor: Anchor?,
+        listener: CloudAnchorListener?,
+        ttl: Int
+    ) {
+        if (anchor == null) return
+        val callback = BiConsumer<String, CloudAnchorState> { cloudAnchorId, state ->
+            if (state == CloudAnchorState.SUCCESS) {
+                listener!!.onCloudTaskComplete(anchorName, anchor, state, cloudAnchorId)
+            }
+        }
+        session.hostCloudAnchorAsync(anchor, ttl, callback)
     }
 
     @Synchronized
     fun resolveCloudAnchor(anchorId: String?, listener: CloudAnchorListener?) {
-        val newAnchor = session.resolveCloudAnchor(anchorId)
-        // Register listener so it is invoked when the operation finishes
-        pendingAnchors[newAnchor] = Pair(null, listener)
-    }
-
-    // Updating function that should be called after each session.update call
-    @Synchronized
-    fun onUpdate(updatedAnchors: Collection<Anchor>) {
-        for (anchor in updatedAnchors) {
-            if (pendingAnchors.containsKey(anchor)) {
-                if (anchor.cloudAnchorState != CloudAnchorState.NONE && anchor.cloudAnchorState != CloudAnchorState.TASK_IN_PROGRESS){
-                    val element: Pair<String?, CloudAnchorListener?>? = pendingAnchors.remove(anchor)
-                    element!!.second!!.onCloudTaskComplete(element.first, anchor)
-                }
+        if (anchorId == null) return
+        val callback = BiConsumer<com.google.ar.core.Anchor, com.google.ar.core.Anchor.CloudAnchorState> { resultAnchor, state ->
+            if (state == CloudAnchorState.SUCCESS) {
+                listener?.onCloudTaskComplete(anchorId, resultAnchor, state, anchorId)
             }
         }
+        session.resolveCloudAnchorAsync(anchorId, callback)
+    }
+
+    // Updating function no longer strictly needed, but kept for compatibility
+    @Synchronized
+    fun onUpdate(@Suppress("UNUSED_PARAMETER") updatedAnchors: Collection<Anchor>) {
+        // No-op, since async callbacks now handle completion
+        // But we keep this method so external code doesn't break
     }
 
     @Synchronized
@@ -65,5 +78,4 @@ internal class CloudAnchorHandler( arSession: Session ) {
     fun clearListeners() {
         pendingAnchors.clear()
     }
-
 }

@@ -59,11 +59,11 @@ fun serializePoseWithScale(pose: Pose, scale: Vector3): DoubleArray {
     return serializedPoseDouble
 }
 
-fun serializeAnchor(anchorNode: AnchorNode, anchor: Anchor?): HashMap<String, Any?> {
+fun serializeAnchor(anchorNode: AnchorNode, anchor: Anchor?, cloudAnchorId: String?): HashMap<String, Any?> {
     val serializedAnchor = HashMap<String, Any?>()
     serializedAnchor["type"] = 0 // index for plane anchors
     serializedAnchor["name"] = anchorNode.name
-    serializedAnchor["cloudanchorid"] = anchor?.cloudAnchorId
+    serializedAnchor["cloudanchorid"] = cloudAnchorId
     serializedAnchor["transformation"] = if (anchor != null) serializePose(anchor.pose) else null
     serializedAnchor["childNodes"] = anchorNode.children.map { child -> child.name }
 
@@ -98,7 +98,7 @@ fun serializeGeospatialAnchor(
 
     serializedAnchor["type"] = 1 // index for geospatial anchors
     serializedAnchor["name"] = name
-    serializedAnchor["cloudanchorid"] = anchor?.cloudAnchorId
+    serializedAnchor["cloudanchorid"] = cloudAnchorId
     serializedAnchor["transformation"] = serializePoseAsList(anchor.pose)
 
     serializedAnchor["latitude"] = latitude

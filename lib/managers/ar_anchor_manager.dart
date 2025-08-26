@@ -68,6 +68,7 @@ class ARAnchorManager {
           }
           break;
         case "onAnchorDownloadSuccess":
+          print('ANCHOR DOWNLOADED');
           final serializedAnchor = call.arguments;
           if (onAnchorDownloaded != null) {
             ARAnchor anchor = onAnchorDownloaded!(
