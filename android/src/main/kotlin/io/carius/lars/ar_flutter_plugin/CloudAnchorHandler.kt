@@ -24,6 +24,7 @@ internal class CloudAnchorHandler(arSession: Session) {
     fun hostCloudAnchor(anchorName: String, anchor: Anchor?, listener: CloudAnchorListener?) {
         if (anchor == null) return
         val callback = BiConsumer<String, CloudAnchorState> { cloudAnchorId, state ->
+            Log.d(TAG, "State " + state.toString() + " for " + anchorName + " with id " + cloudAnchorId)
             if (state == CloudAnchorState.SUCCESS) {
                 listener!!.onCloudTaskComplete(anchorName, anchor, state, cloudAnchorId)
             }
@@ -40,6 +41,7 @@ internal class CloudAnchorHandler(arSession: Session) {
     ) {
         if (anchor == null) return
         val callback = BiConsumer<String, CloudAnchorState> { cloudAnchorId, state ->
+            Log.d(TAG, "State " + state.toString() + " for " + anchorName + " with id " + cloudAnchorId)
             if (state == CloudAnchorState.SUCCESS) {
                 listener!!.onCloudTaskComplete(anchorName, anchor, state, cloudAnchorId)
             }
@@ -51,6 +53,7 @@ internal class CloudAnchorHandler(arSession: Session) {
     fun resolveCloudAnchor(anchorId: String?, listener: CloudAnchorListener?) {
         if (anchorId == null) return
         val callback = BiConsumer<com.google.ar.core.Anchor, com.google.ar.core.Anchor.CloudAnchorState> { resultAnchor, state ->
+            Log.d(TAG, "State " + state.toString() + " for " + anchorId)
             if (state == CloudAnchorState.SUCCESS) {
                 listener?.onCloudTaskComplete(anchorId, resultAnchor, state, anchorId)
             }
@@ -63,19 +66,5 @@ internal class CloudAnchorHandler(arSession: Session) {
     fun onUpdate(@Suppress("UNUSED_PARAMETER") updatedAnchors: Collection<Anchor>) {
         // No-op, since async callbacks now handle completion
         // But we keep this method so external code doesn't break
-    }
-
-    @Synchronized
-    fun dispose() {
-        for (pendingAnchor in pendingAnchors) {
-            pendingAnchor.key.detach()
-        }
-        clearListeners()
-    }
-
-    // Remove all listeners
-    @Synchronized
-    fun clearListeners() {
-        pendingAnchors.clear()
     }
 }

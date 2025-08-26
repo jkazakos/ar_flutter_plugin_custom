@@ -728,7 +728,7 @@ internal class AndroidARView(
                     anchor?.detach()
                 }
             }
-            cloudAnchorHandler.dispose();
+//            cloudAnchorHandler.dispose();
             arSceneView.scene?.removeOnUpdateListener(sceneUpdateListener)
             arSceneView.scene?.removeOnPeekTouchListener(onNodeTapListener)
             arSceneView.session?.close()
