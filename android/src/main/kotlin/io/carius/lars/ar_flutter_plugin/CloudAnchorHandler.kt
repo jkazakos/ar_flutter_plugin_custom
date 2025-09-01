@@ -14,23 +14,16 @@ internal class CloudAnchorHandler(arSession: Session) {
     // Listener that can be attached to hosting or resolving processes
     interface CloudAnchorListener {
         // Callback to invoke when cloud anchor task finishes
-        fun onCloudTaskComplete(anchorName: String?, anchor: Anchor?, state: CloudAnchorState, cloudAnchorId: String)
+        fun onCloudTaskComplete(
+            anchorName: String?,
+            anchor: Anchor?,
+            state: CloudAnchorState,
+            cloudAnchorId: String
+        )
     }
 
     private val TAG: String = CloudAnchorHandler::class.java.simpleName
     private val session: Session = arSession
-
-    @Synchronized
-    fun hostCloudAnchor(anchorName: String, anchor: Anchor?, listener: CloudAnchorListener?) {
-        if (anchor == null) return
-        val callback = BiConsumer<String, CloudAnchorState> { cloudAnchorId, state ->
-            Log.d(TAG, "State " + state.toString() + " for " + anchorName + " with id " + cloudAnchorId)
-            if (state == CloudAnchorState.SUCCESS) {
-                listener!!.onCloudTaskComplete(anchorName, anchor, state, cloudAnchorId)
-            }
-        }
-        session.hostCloudAnchorAsync(anchor, /* ttlDays = */ 1, callback)
-    }
 
     @Synchronized
     fun hostCloudAnchorWithTtl(
@@ -41,23 +34,39 @@ internal class CloudAnchorHandler(arSession: Session) {
     ) {
         if (anchor == null) return
         val callback = BiConsumer<String, CloudAnchorState> { cloudAnchorId, state ->
-            Log.d(TAG, "State " + state.toString() + " for " + anchorName + " with id " + cloudAnchorId)
-            if (state == CloudAnchorState.SUCCESS) {
-                listener!!.onCloudTaskComplete(anchorName, anchor, state, cloudAnchorId)
+            try {
+                Log.d(
+                    TAG,
+                    "State $state for $anchorName with id $cloudAnchorId"
+                )
+                if (state == CloudAnchorState.SUCCESS) {
+                    listener!!.onCloudTaskComplete(anchorName, anchor, state, cloudAnchorId)
+                }
+            } catch (e: Exception) {
+                Log.d(TAG, e.toString())
             }
         }
-        session.hostCloudAnchorAsync(anchor, ttl, callback)
+        try {
+            session.hostCloudAnchorAsync(anchor, ttl, callback)
+        } catch (e: Exception) {
+            Log.d(TAG, e.toString())
+        }
     }
 
     @Synchronized
     fun resolveCloudAnchor(anchorId: String?, listener: CloudAnchorListener?) {
         if (anchorId == null) return
-        val callback = BiConsumer<com.google.ar.core.Anchor, com.google.ar.core.Anchor.CloudAnchorState> { resultAnchor, state ->
-            Log.d(TAG, "State " + state.toString() + " for " + anchorId)
-            if (state == CloudAnchorState.SUCCESS) {
-                listener?.onCloudTaskComplete(anchorId, resultAnchor, state, anchorId)
+        val callback =
+            BiConsumer<Anchor, CloudAnchorState> { resultAnchor, state ->
+                try {
+                    Log.d(TAG, "State $state for $anchorId")
+                    if (state == CloudAnchorState.SUCCESS) {
+                        listener?.onCloudTaskComplete(anchorId, resultAnchor, state, anchorId)
+                    }
+                } catch (e: Exception) {
+                    Log.d(TAG, e.toString())
+                }
             }
-        }
         try {
             session.resolveCloudAnchorAsync(anchorId, callback)
         } catch (e: Exception) {

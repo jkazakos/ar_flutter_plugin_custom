@@ -518,12 +518,6 @@ internal class AndroidARView(
                                     cloudAnchorUploadedListener(),
                                     ttl!!
                                 )
-                            } else {
-                                cloudAnchorHandler.hostCloudAnchor(
-                                    anchorName,
-                                    anchorNode!!.anchor,
-                                    cloudAnchorUploadedListener()
-                                )
                             }
                             //Log.d(TAG, "---------------- HOSTING INITIATED ------------------")
                             result.success(true)
