@@ -59,7 +59,7 @@ internal class CloudAnchorHandler(arSession: Session) {
         val callback =
             BiConsumer<Anchor?, CloudAnchorState>(fun(
                 resultAnchor: Anchor?,
-                state: CloudAnchorState?
+                state: CloudAnchorState
             ) {
                 // resultAnchor is now nullable
                 try {
