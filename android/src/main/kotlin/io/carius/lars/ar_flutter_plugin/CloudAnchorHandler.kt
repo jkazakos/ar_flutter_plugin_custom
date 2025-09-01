@@ -58,7 +58,11 @@ internal class CloudAnchorHandler(arSession: Session) {
                 listener?.onCloudTaskComplete(anchorId, resultAnchor, state, anchorId)
             }
         }
-        session.resolveCloudAnchorAsync(anchorId, callback)
+        try {
+            session.resolveCloudAnchorAsync(anchorId, callback)
+        } catch (e: Exception) {
+            Log.d(TAG, e.toString())
+        }
     }
 
     // Updating function no longer strictly needed, but kept for compatibility
