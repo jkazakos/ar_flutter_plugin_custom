@@ -57,22 +57,50 @@ internal class CloudAnchorHandler(arSession: Session) {
     fun resolveCloudAnchor(anchorId: String?, listener: CloudAnchorListener?) {
         if (anchorId == null) return
         val callback =
-            BiConsumer<Anchor, CloudAnchorState> { resultAnchor, state ->
+            BiConsumer<Anchor?, CloudAnchorState>(fun(
+                resultAnchor: Anchor?,
+                state: CloudAnchorState?
+            ) {
+                // resultAnchor is now nullable
                 try {
                     Log.d(TAG, "State $state for $anchorId")
-                    if (state == CloudAnchorState.SUCCESS) {
+                    if (state == CloudAnchorState.SUCCESS && resultAnchor != null) {
                         listener?.onCloudTaskComplete(anchorId, resultAnchor, state, anchorId)
+                    } else {
+                        // Handle the case where resolution failed or resultAnchor is null
+                        // You might want to pass a specific error state if available
+                        // For now, we'll pass the received state, or a generic error if it's SUCCESS but anchor is null
+                        val reportedState = if (state == CloudAnchorState.SUCCESS) {
+                            Log.w(
+                                TAG,
+                                "Cloud anchor $anchorId resolved with SUCCESS state but null anchor. Reporting as ERROR_INTERNAL."
+                            )
+                            CloudAnchorState.ERROR_INTERNAL // Or another appropriate error state
+                        } else {
+                            state
+                        }
+                        listener?.onCloudTaskComplete(anchorId, null, reportedState, anchorId)
                     }
                 } catch (e: Exception) {
-                    Log.d(TAG, e.toString())
+                    Log.d(TAG, "Error in resolveCloudAnchor callback: ${e.toString()}")
+                    // Also notify listener of failure in case of an exception within the callback
+                    listener?.onCloudTaskComplete(
+                        anchorId,
+                        null,
+                        CloudAnchorState.ERROR_INTERNAL,
+                        anchorId
+                    )
                 }
-            }
+            })
         try {
             session.resolveCloudAnchorAsync(anchorId, callback)
         } catch (e: Exception) {
-            Log.d(TAG, e.toString())
+            Log.d(TAG, "Error calling resolveCloudAnchorAsync: ${e.toString()}")
+            // Notify listener of failure if the async call itself throws an exception
+            listener?.onCloudTaskComplete(anchorId, null, CloudAnchorState.ERROR_INTERNAL, anchorId)
         }
     }
+
 
     // Updating function no longer strictly needed, but kept for compatibility
     @Synchronized
