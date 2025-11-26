@@ -1001,7 +1001,7 @@ internal class AndroidARView(
                             val errorString = "Unable to load renderable: ${dict_node["uri"] as String}\n" +
                                     "Error: ${throwable.message}\n" +
                                     "Stack Trace:\n${Log.getStackTraceString(throwable)}" // <-- Print full stack trace
-
+                            Log.d(TAG, errorString)
                             val mainHandler = Handler(viewContext.mainLooper)
                             val runnable = Runnable {
                                 sessionManagerChannel.invokeMethod(
