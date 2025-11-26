@@ -998,11 +998,15 @@ internal class AndroidARView(
                         }
                         .exceptionally { throwable ->
                             // Pass error to session manager (this has to be done on the main thread if this activity)
+                            val errorString = "Unable to load renderable: ${dict_node["uri"] as String}\n" +
+                                    "Error: ${throwable.message}\n" +
+                                    "Stack Trace:\n${Log.getStackTraceString(throwable)}" // <-- Print full stack trace
+
                             val mainHandler = Handler(viewContext.mainLooper)
                             val runnable = Runnable {
                                 sessionManagerChannel.invokeMethod(
                                     "onError",
-                                    listOf("Unable to load renderable" + dict_node["uri"] as String)
+                                    listOf(errorString) // Send the detailed error string
                                 )
                             }
                             mainHandler.post(runnable)
