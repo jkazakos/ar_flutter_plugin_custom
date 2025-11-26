@@ -1344,7 +1344,7 @@ internal class AndroidARView(
                     override fun success(result: Any?) {
                         newAnchorNode.name = result.toString()
                         newAnchorNode.setParent(arSceneView.scene)
-                        //Log.d(TAG, "---------------- REGISTERING ANCHOR SUCCESSFUL ------------------")
+                        Log.d(TAG, "---------------- REGISTERING ANCHOR SUCCESSFUL ------------------")
                     }
 
                     override fun error(
