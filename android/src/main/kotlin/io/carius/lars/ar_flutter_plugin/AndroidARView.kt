@@ -979,7 +979,8 @@ internal class AndroidARView(
                         dict_node["transformation"] as ArrayList<Double>
                     )
                         .thenAccept { node ->
-                            val anchorName: String? = dict_anchor?.get("name") as? String
+                            Log.d(TAG, "searching for " + dict_anchor.toString())
+                            val anchorName: String? = dict_anchor?.get("cloudanchorid") as? String
                             val anchorType: Int? = dict_anchor?.get("type") as? Int
                             if (anchorName != null && anchorType != null) {
                                 val anchorNode =
@@ -1346,7 +1347,8 @@ internal class AndroidARView(
                 serializeAnchor(newAnchorNode, anchor, cloudAnchorId),
                 object : MethodChannel.Result {
                     override fun success(result: Any?) {
-                        newAnchorNode.name = result.toString()
+                        Log.d(TAG, "setting name to anchor node " + cloudAnchorId)
+                        newAnchorNode.name = cloudAnchorId
                         newAnchorNode.setParent(arSceneView.scene)
                         Log.d(TAG, "---------------- REGISTERING ANCHOR SUCCESSFUL ------------------")
                     }
