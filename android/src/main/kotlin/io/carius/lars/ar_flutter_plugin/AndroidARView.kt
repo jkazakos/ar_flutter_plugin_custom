@@ -34,6 +34,9 @@ import java.io.IOException
 import java.nio.FloatBuffer
 import java.util.concurrent.CompletableFuture
 import java.util.UUID
+import java.io.File
+import java.io.FileOutputStream
+import com.google.ar.sceneform.math.Quaternion
 
 import android.R
 import com.google.ar.sceneform.rendering.*
@@ -230,45 +233,65 @@ internal class AndroidARView(
                         resultMap["earthState"] =
                             earth.earthState.name       // Convert enum to string
 
-                        result.success(resultMap) // Send the map back
-                    }
+                            result.success(resultMap) // Send the map back
+                        }
+                        "setNodeLookDirection" -> {
+                            val anchorId = call.argument<String>("anchorId")
+                            val dir = call.argument<List<Double>>("lookDirection")
 
-                    "placeBasedOnCoordinates" -> {
-                        if (call.arguments is Map<*, *>) {
-                            val cpuCoordinates = floatArrayOf(
-                                (call.arguments as Map<*, *>)['x'] as Float,
-                                (call.arguments as Map<*, *>)['y'] as Float
-                            )
-                            val viewCoordinates = FloatArray(2)
-                            if (arSceneView.arFrame != null) {
-                                arSceneView.arFrame!!.transformCoordinates2d(
-                                    Coordinates2d.IMAGE_PIXELS,
-                                    cpuCoordinates,
-                                    Coordinates2d.VIEW,
-                                    viewCoordinates
-                                )
-                                val allHitResults = arSceneView.arFrame!!.hitTest(
-                                    viewCoordinates[0],
-                                    viewCoordinates[1]
-                                )
-                                val planeAndPointHitResults =
-                                    allHitResults.filter { ((it.trackable is Plane) || (it.trackable is Point)) }
-                                val serializedPlaneAndPointHitResults: ArrayList<HashMap<String, Any>> =
-                                    ArrayList(planeAndPointHitResults.map { serializeHitResult(it) })
-                                result.success(serializedPlaneAndPointHitResults)
+                            if (dir == null || dir.size < 3) {
+                                // Log.d("NodeDirection", "setNodeLookDirection failed: Invalid arguments")
+                                result.error("Error", "Invalid arguments for setNodeLookDirection", null)
+                                return
+                            }
+
+                            val anchorNode = arSceneView.scene.findByName(anchorId) as? AnchorNode
+                            // Log.d("NodeDirection", "AnchorNode found: ${anchorNode != null}, type: ${anchorNode?.javaClass?.simpleName}")
+
+                            if (anchorNode == null) {
+                                // Log.d("NodeDirection", "setNodeLookDirection failed: AnchorNode not found")
+                                result.error("Error", "AnchorNode not found for anchorId: $anchorId", null)
+                                return
+                            }
+                            val childNode = anchorNode.children.firstOrNull()
+
+                            if (childNode != null) {
+                                val direction = Vector3(dir[0].toFloat(), dir[1].toFloat(), dir[2].toFloat())
+                                val lookRotation = Quaternion.lookRotation(direction, Vector3.up())
+                                val correction = Quaternion(Vector3.up(), +90f) // rotate -90° around Y
+                                childNode.worldRotation = Quaternion.multiply(lookRotation, correction)
+                                // Log.d("NodeDirection", "setNodeLookDirection succeeded for anchorId: $anchorId with direction: $direction")
+                                result.success(null)
+                            } else {
+                                result.error("Error", "Could not apply rotation", null)
+                            }
+                        }
+                        "placeBasedOnCoordinates" -> {
+                            if (call.arguments is Map<*,*>) {
+                                val cpuCoordinates = floatArrayOf((call.arguments as Map<*, *>)['x'] as Float, (call.arguments as Map<*, *>)['y'] as Float)
+                                val viewCoordinates = FloatArray(2)
+                                if (arSceneView.arFrame != null) {
+                                    arSceneView.arFrame!!.transformCoordinates2d(
+                                            Coordinates2d.IMAGE_PIXELS,
+                                            cpuCoordinates,
+                                            Coordinates2d.VIEW,
+                                            viewCoordinates
+                                    )
+                                    val allHitResults = arSceneView.arFrame!!.hitTest(viewCoordinates[0], viewCoordinates[1])
+                                    val planeAndPointHitResults = allHitResults.filter { ((it.trackable is Plane) || (it.trackable is Point)) }
+                                    val serializedPlaneAndPointHitResults: ArrayList<HashMap<String, Any>> =
+                                            ArrayList(planeAndPointHitResults.map { serializeHitResult(it) })
+                                    result.success(serializedPlaneAndPointHitResults)
+                                } else {
+                                    result.success(null)
+                                }
                             } else {
                                 result.success(null)
                             }
-                        } else {
-                            result.success(null)
                         }
-                    }
-
-                    "snapshot" -> {
-                        var bitmap = Bitmap.createBitmap(
-                            arSceneView.width, arSceneView.height,
-                            Bitmap.Config.ARGB_8888
-                        );
+                        "snapshot" -> {
+                            var bitmap = Bitmap.createBitmap(arSceneView.width, arSceneView.height,
+                                    Bitmap.Config.ARGB_8888);
 
 
                         // Create a handler thread to offload the processing of the image.
@@ -661,7 +684,7 @@ internal class AndroidARView(
                     // Enable Geospatial mode here
                     config.geospatialMode = Config.GeospatialMode.ENABLED
                     // Optional: Enabling cloud anchors if needed
-                    // config.cloudAnchorMode = Config.CloudAnchorMode.ENABLED
+                    config.cloudAnchorMode = Config.CloudAnchorMode.ENABLED
 
                     session.configure(config)
                     arSceneView.setupSession(session)
@@ -1113,22 +1136,56 @@ internal class AndroidARView(
                     val assetPath = documentsPath + "/app_flutter/" + dict_node["uri"] as String
 
                     // Add object to scene
-                    modelBuilder.makeNodeFromGltf(
-                        viewContext,
-                        transformationSystem,
-                        objectManagerChannel,
-                        enablePans,
-                        enableRotation,
-                        dict_node["name"] as String,
-                        assetPath,
-                        dict_node["transformation"] as ArrayList<Double>
-                    )
+                    modelBuilder.makeNodeFromGltf(viewContext, transformationSystem, objectManagerChannel, enablePans, enableRotation, dict_node["name"] as String, assetPath, dict_node["transformation"] as ArrayList<Double>)
+                            .thenAccept{node ->
+                                val anchorName: String? = dict_anchor?.get("name") as? String
+                                val anchorType: Int? = dict_anchor?.get("type") as? Int
+                                if (anchorName != null && anchorType != null) {
+                                    val anchorNode = arSceneView.scene.findByName(anchorName) as AnchorNode?
+                                    if (anchorNode != null) {
+                                        anchorNode.addChild(node)
+                                        completableFutureSuccess.complete(true)
+                                    } else {
+                                        completableFutureSuccess.complete(false)
+                                    }
+                                } else {
+                                    arSceneView.scene.addChild(node)
+                                    completableFutureSuccess.complete(true)
+                                }
+                                completableFutureSuccess.complete(false)
+                            }
+                            .exceptionally { throwable ->
+                                // Pass error to session manager (this has to be done on the main thread if this activity)
+                                val mainHandler = Handler(viewContext.mainLooper)
+                                val runnable = Runnable {sessionManagerChannel.invokeMethod("onError", listOf("Unable to load renderable" +  dict_node["uri"] as String)) }
+                                mainHandler.post(runnable)
+                                completableFutureSuccess.completeExceptionally(throwable)
+                                null // return null because java expects void return (in java, void has no instance, whereas in Kotlin, this closure returns a Unit which has one instance)
+                            }
+                }
+                4 -> { // GLB Model from Flutter assets folder
+                    // Get path to given Flutter asset
+                    val loader: FlutterLoader = FlutterInjector.instance().flutterLoader()
+                    val assetKey: String = loader.getLookupKeyForAsset(dict_node["uri"] as String)
+
+                    val inputStream = viewContext.assets.open(assetKey)
+                    val tempFile = File(viewContext.cacheDir, File(assetKey).name)
+                    inputStream.use { input ->
+                        FileOutputStream(tempFile).use { output ->
+                            input.copyTo(output)
+                        }
+                    }
+
+                    val assetFilePath = tempFile.absolutePath
+
+                    modelBuilder.makeNodeFromGlb(viewContext, transformationSystem, objectManagerChannel, enablePans, enableRotation, dict_node["name"] as String, assetFilePath, dict_node["transformation"] as ArrayList<Double>)
                         .thenAccept { node ->
-                            val anchorName: String? = dict_anchor?.get("name") as? String
+                            val anchorName: String? = dict_anchor?.get("cloudanchorid") as? String
                             val anchorType: Int? = dict_anchor?.get("type") as? Int
-                            if (anchorName != null && anchorType != null) {
-                                val anchorNode =
-                                    arSceneView.scene.findByName(anchorName) as AnchorNode?
+                            val targetName = if (anchorName != null) anchorName else dict_anchor?.get("name") as? String
+
+                            if (targetName != null && anchorType != null) {
+                                val anchorNode = arSceneView.scene.findByName(targetName) as AnchorNode?
                                 if (anchorNode != null) {
                                     anchorNode.addChild(node)
                                     completableFutureSuccess.complete(true)
@@ -1140,16 +1197,9 @@ internal class AndroidARView(
                                 completableFutureSuccess.complete(true)
                             }
                             completableFutureSuccess.complete(false)
-                        }
-                        .exceptionally { throwable ->
-                            // Pass error to session manager (this has to be done on the main thread if this activity)
+                        }.exceptionally { throwable ->
                             val mainHandler = Handler(viewContext.mainLooper)
-                            val runnable = Runnable {
-                                sessionManagerChannel.invokeMethod(
-                                    "onError",
-                                    listOf("Unable to load renderable" + dict_node["uri"] as String)
-                                )
-                            }
+                            val runnable = Runnable { sessionManagerChannel.invokeMethod("onError", listOf("Unable to load renderable from asset: ${dict_node["uri"]}")) }
                             mainHandler.post(runnable)
                             completableFutureSuccess.completeExceptionally(throwable)
                             null // return null because java expects void return (in java, void has no instance, whereas in Kotlin, this closure returns a Unit which has one instance)
@@ -1339,6 +1389,11 @@ internal class AndroidARView(
             //Log.d(TAG, "---------------- RESOLVING SUCCESSFUL ------------------")
             val newAnchorNode = AnchorNode(anchor)
             // Register new anchor on the Flutter side of the plugin
+
+            Log.d(TAG, "setting name to anchor node " + cloudAnchorId)
+            newAnchorNode.name = cloudAnchorId
+
+            newAnchorNode.setParent(arSceneView.scene)
 
             Log.i(TAG, "Invoke method onAnchorDownloadSuccess")
 

@@ -249,4 +249,17 @@ class ARSessionManager {
       };
     }
   }
+
+  /// NEW METHOD: Sets the look direction of a node in the AR scene.
+  Future<void> setNodeLookDirection({required String anchorId, required Vector3 direction,}) async {
+    try {
+      await _channel.invokeMethod('setNodeLookDirection', {
+        'anchorId': anchorId,
+        'lookDirection': [direction.x, direction.y, direction.z],
+      });
+    } catch (e) {
+      debugPrint("Error setting node look direction: $e");
+    }
+  }
+
 }

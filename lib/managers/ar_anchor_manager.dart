@@ -117,7 +117,6 @@ class ARAnchorManager {
   /// Try to download anchor with the given ID from the Google Cloud Anchor API and add it to the scene
   Future<bool?> downloadAnchor(String cloudanchorid) async {
     print("TRYING TO DOWNLOAD ANCHOR WITH ID " + cloudanchorid);
-    _channel
-        .invokeMethod<bool>('downloadAnchor', {"cloudanchorid": cloudanchorid});
+    return await _channel.invokeMethod<bool>('downloadAnchor', {"cloudanchorid": cloudanchorid});
   }
 }
