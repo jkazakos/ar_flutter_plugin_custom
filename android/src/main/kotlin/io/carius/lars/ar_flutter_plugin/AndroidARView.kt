@@ -771,6 +771,9 @@ internal class AndroidARView(
 
         sceneUpdateListener =
             com.google.ar.sceneform.Scene.OnUpdateListener { frameTime: FrameTime ->
+                // Increase the far clipping plane to render objects at greater distances
+                // Do this every frame because ARCore sometimes overrides the projection matrix
+                arSceneView.scene?.camera?.farClipPlane = 150f
                 onFrame(frameTime)
             }
         onNodeTapListener =
