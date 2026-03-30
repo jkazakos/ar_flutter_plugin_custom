@@ -396,7 +396,7 @@ internal class AndroidARView(
                             }
                             val node = arSceneView.scene.findByName(nodeName)
                             node?.let {
-                                arSceneView.scene.removeChild(node)
+                                node.setParent(null)
                                 result.success(null)
                             }
                         }
