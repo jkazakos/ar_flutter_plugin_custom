@@ -23,6 +23,7 @@ class IosARView: NSObject, FlutterPlatformView, ARSCNViewDelegate, UIGestureReco
     private var cloudAnchorHandler: CloudAnchorHandler? = nil
     private var arcoreSession: GARSession? = nil
     private var arcoreMode: Bool = false
+    private var latestGarFrame: GARFrame? = nil
     private var configuration: ARWorldTrackingConfiguration!
     private var tappedPlaneAnchorAlignment = ARPlaneAnchor.Alignment.horizontal // default alignment
     
@@ -88,28 +89,67 @@ class IosARView: NSObject, FlutterPlatformView, ARSCNViewDelegate, UIGestureReco
                 result(htResult);
                 break;
             case "placeGeospatial":
-            do {
-                var coordinates = CLLocationCoordinate2D();
-                coordinates.latitude = arguments!["lat"] as! Double;
-                coordinates.longitude = arguments!["lon"] as! Double;
-                try arcoreSession!.createAnchorOnTerrain(
-                    coordinate: coordinates,
-                    altitudeAboveTerrain: arguments!["alt"] as! Double,
-                    eastUpSouthQAnchor: simd_quatf(vector: simd_float4(x: 0, y: 0, z: 0, w: 0)),
-                    completionHandler: { anchor, state in
-                        print(state.rawValue);
-                        if (state == GARTerrainAnchorState.success) {
-                            let newAnchor = ARAnchor(transform: anchor!.transform);
-                            result(serializeAnchor(anchor: newAnchor, anchorNode: nil, ganchor: anchor!, name: arguments!["name"] as! String));
-                        } else {
-                            result(nil);
-                        }
+                do {
+                    if let lat = arguments!["latitude"] as? Double,
+                       let lon = arguments!["longitude"] as? Double,
+                       let alt = arguments!["altitude"] as? Double,
+                       let name = arguments!["name"] as? String,
+                       let qx = arguments!["qx"] as? Double,
+                       let qy = arguments!["qy"] as? Double,
+                       let qz = arguments!["qz"] as? Double,
+                       let qw = arguments!["qw"] as? Double {
+                        
+                        var coordinates = CLLocationCoordinate2D();
+                        coordinates.latitude = lat;
+                        coordinates.longitude = lon;
+                        
+                        let ganchor = try arcoreSession!.createAnchor(
+                            coordinate: coordinates,
+                            altitude: alt,
+                            eastUpSouthQAnchor: simd_quatf(ix: Float(qx), iy: Float(qy), iz: Float(qz), r: Float(qw))
+                        )
+                        
+                        let newAnchor = ARAnchor(transform: ganchor.transform);
+                        self.sceneView.session.add(anchor: newAnchor)
+                        self.anchorCollection[name] = newAnchor
+                        result(serializeGeospatialAnchor(anchor: newAnchor, anchorNode: nil, ganchor: ganchor, name: name, latitude: lat, longitude: lon, altitude: alt, qx: Float(qx), qy: Float(qy), qz: Float(qz), qw: Float(qw)));
+                    } else {
+                        result(nil)
                     }
-                );
-            } catch {
-                print(error)
-                result(nil);
-            }
+                } catch {
+                    print(error)
+                    result(nil);
+                }
+                break;
+            case "checkEarthTracking":
+                if let earth = latestGarFrame?.earth {
+                    let trackingStateStr: String
+                    switch earth.trackingState {
+                    case .tracking: trackingStateStr = "TRACKING"
+                    case .paused: trackingStateStr = "PAUSED"
+                    case .stopped: trackingStateStr = "STOPPED"
+                    @unknown default: trackingStateStr = "UNKNOWN"
+                    }
+                    
+                    let earthStateStr: String
+                    switch earth.earthState {
+                    case .enabled: earthStateStr = "ENABLED"
+                    case .errorInternal: earthStateStr = "ERROR_INTERNAL"
+                    case .errorNotAuthorized: earthStateStr = "ERROR_NOT_AUTHORIZED"
+                    case .errorResourceExhausted: earthStateStr = "ERROR_RESOURCE_EXHAUSTED"
+                    @unknown default: earthStateStr = "UNKNOWN"
+                    }
+                    
+                    var resultMap = [String: String]()
+                    resultMap["trackingState"] = trackingStateStr
+                    resultMap["earthState"] = earthStateStr
+                    result(resultMap)
+                } else {
+                    var resultMap = [String: String]()
+                    resultMap["trackingState"] = "ERROR"
+                    resultMap["earthState"] = "ERROR_EARTH_NOT_AVAILABLE"
+                    result(resultMap)
+                }
                 break;
             case "getCameraPose":
                 if let cameraPose = sceneView.session.currentFrame?.camera.transform {
@@ -123,6 +163,31 @@ class IosARView: NSObject, FlutterPlatformView, ARSCNViewDelegate, UIGestureReco
                     result(serializeMatrix(cameraPose))
                 } else {
                     result(FlutterError())
+                }
+                break
+            case "setNodeLookDirection":
+                if let anchorId = arguments!["anchorId"] as? String, let dir = arguments!["lookDirection"] as? [Double] {
+                    if dir.count >= 3, let anchor = anchorCollection[anchorId] {
+                        if let anchorNode = sceneView.node(for: anchor) {
+                            if let childNode = anchorNode.childNodes.first {
+                                let direction = SCNVector3(Float(dir[0]), Float(dir[1]), Float(dir[2]))
+                                // Calculate look at position
+                                let lookAtPosition = SCNVector3(childNode.worldPosition.x + direction.x,
+                                                                childNode.worldPosition.y + direction.y,
+                                                                childNode.worldPosition.z + direction.z)
+                                childNode.look(at: lookAtPosition)
+                                result(nil)
+                            } else {
+                                result(FlutterError(code: "Error", message: "Could not apply rotation", details: nil))
+                            }
+                        } else {
+                            result(FlutterError(code: "Error", message: "AnchorNode not found for anchorId: \(anchorId)", details: nil))
+                        }
+                    } else {
+                        result(FlutterError(code: "Error", message: "Invalid arguments for setNodeLookDirection", details: nil))
+                    }
+                } else {
+                    result(FlutterError(code: "Error", message: "Invalid arguments for setNodeLookDirection", details: nil))
                 }
                 break
             case "snapshot":
@@ -162,6 +227,15 @@ class IosARView: NSObject, FlutterPlatformView, ARSCNViewDelegate, UIGestureReco
                     addNode(dict_node: dict_node, dict_anchor: dict_anchor).sink(receiveCompletion: {completion in }, receiveValue: { val in
                            result(val)
                         }).store(in: &self.cancellableCollection)
+                }
+                break
+            case "addNodeToGeospatialAnchor":
+                if let dict_node = arguments!["node"] as? Dictionary<String, Any>, let dict_anchor = arguments!["anchor"] as? Dictionary<String, Any> {
+                    addNode(dict_node: dict_node, dict_anchor: dict_anchor).sink(receiveCompletion: {completion in }, receiveValue: { val in
+                           result(val)
+                        }).store(in: &self.cancellableCollection)
+                } else {
+                    result(false)
                 }
                 break
             case "removeNode":
@@ -211,32 +285,39 @@ class IosARView: NSObject, FlutterPlatformView, ARSCNViewDelegate, UIGestureReco
                     deleteAnchor(anchorName: name)
                 }
                 break
-        case "initGeoSpatialMode":
-            arcoreSession = try! GARSession.session()
-
-            if (arcoreSession != nil){
-                
-//                    configuration.cloudAnchorMode = .enabled;
-
-                if let token = JWTGenerator().generateWebToken(){
-                    arcoreSession!.setAuthToken(token)
-
-//                    cloudAnchorHandler = CloudAnchorHandler(session: arcoreSession!)
-//                    arcoreSession!.delegate = cloudAnchorHandler
-                    arcoreSession!.delegateQueue = DispatchQueue.main
-                    
-                    let configuration = GARSessionConfiguration();
-                    configuration.geospatialMode = .enabled;
-                    arcoreSession?.setConfiguration(configuration, error: nil);
-
-                    arcoreMode = true
-                } else {
-                    sessionManagerChannel.invokeMethod("onError", arguments: ["Error generating JWT, have you added cloudAnchorKey.json into the example/ios/Runner directory?"])
+        case "initGeospatialMode":
+                var apiKey: String? = nil
+                let envKey = FlutterDartProject.lookupKey(forAsset: ".env")
+                if let envPath = Bundle.main.path(forResource: envKey, ofType: nil),
+                   let envString = try? String(contentsOfFile: envPath) {
+                    envString.enumerateLines { line, _ in
+                        let parts = line.split(separator: "=", maxSplits: 1).map(String.init)
+                        if parts.count == 2, parts[0].trimmingCharacters(in: .whitespaces) == "GOOGLE_MAPS_KEY" {
+                            var key = parts[1].trimmingCharacters(in: CharacterSet(charactersIn: " \"'"))
+                            apiKey = key.trimmingCharacters(in: .whitespacesAndNewlines)
+                        }
+                    }
                 }
-            } else {
-                sessionManagerChannel.invokeMethod("onError", arguments: ["Error initializing Google AR Session"])
-            }
 
+                if let key = apiKey {
+                    do {
+                        arcoreSession = try GARSession(apiKey: key, bundleIdentifier: nil)
+                        arcoreSession!.delegateQueue = DispatchQueue.main
+                        
+                        let configuration = GARSessionConfiguration();
+                        configuration.geospatialMode = .enabled;
+                        arcoreSession?.setConfiguration(configuration, error: nil);
+
+                        arcoreMode = true
+                        result(nil)
+                    } catch {
+                        sessionManagerChannel.invokeMethod("onError", arguments: ["Error initializing Google AR Session with API key: \(error.localizedDescription)"])
+                        result(FlutterError(code: "Error", message: "Failed to initialize ARCore with API Key", details: nil))
+                    }
+                } else {
+                    sessionManagerChannel.invokeMethod("onError", arguments: ["Error finding GOOGLE_MAPS_KEY in .env for Geospatial API."])
+                    result(FlutterError(code: "Error", message: "API key not found", details: nil))
+                }
             break
             case "initGoogleCloudAnchorMode":
                 arcoreSession = try! GARSession.session()
@@ -427,7 +508,9 @@ class IosARView: NSObject, FlutterPlatformView, ARSCNViewDelegate, UIGestureReco
     func session(_ session: ARSession, didUpdate frame: ARFrame) {
         if (arcoreMode) {
             do {
-                try arcoreSession!.update(frame)
+                if let garFrame = try arcoreSession?.update(frame) {
+                    self.latestGarFrame = garFrame
+                }
             } catch {
                 print(error)
             }

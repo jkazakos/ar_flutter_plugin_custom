@@ -49,3 +49,25 @@ func serializeLocalTransformation(node: SCNNode?) -> Dictionary<String, Any?> {
 
     return serializedLocalTransformation
 }
+
+func serializeGeospatialAnchor(anchor: ARAnchor, anchorNode: SCNNode?, ganchor: GARAnchor, name: String?, latitude: Double, longitude: Double, altitude: Double, qx: Float, qy: Float, qz: Float, qw: Float) -> Dictionary<String, Any?> {
+    var serializedAnchor = Dictionary<String, Any?>()
+    
+    serializedAnchor["type"] = 1 // index for geospatial anchors
+    serializedAnchor["name"] = name
+    serializedAnchor["cloudanchorid"] = ganchor.cloudIdentifier
+    serializedAnchor["transformation"] = serializeMatrix(anchor.transform)
+
+    serializedAnchor["latitude"] = latitude
+    serializedAnchor["longitude"] = longitude
+    serializedAnchor["altitude"] = altitude
+
+    serializedAnchor["qx"] = qx
+    serializedAnchor["qy"] = qy
+    serializedAnchor["qz"] = qz
+    serializedAnchor["qw"] = qw
+
+    serializedAnchor["childNodes"] = anchorNode?.childNodes.map{$0.name}
+
+    return serializedAnchor
+}
