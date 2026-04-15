@@ -89,36 +89,83 @@ class IosARView: NSObject, FlutterPlatformView, ARSCNViewDelegate, UIGestureReco
                 result(htResult);
                 break;
             case "placeGeospatial":
-                do {
-                    if let lat = arguments!["latitude"] as? Double,
-                       let lon = arguments!["longitude"] as? Double,
-                       let alt = arguments!["altitude"] as? Double,
-                       let name = arguments!["name"] as? String,
-                       let qx = arguments!["qx"] as? Double,
-                       let qy = arguments!["qy"] as? Double,
-                       let qz = arguments!["qz"] as? Double,
-                       let qw = arguments!["qw"] as? Double {
+                print("GeoAnchor: placeGeospatial called")
+                if let lat = arguments!["latitude"] as? Double,
+                   let lon = arguments!["longitude"] as? Double,
+                   let alt = arguments!["altitude"] as? Double,
+                   let name = arguments!["name"] as? String,
+                   let qx = arguments!["qx"] as? Double,
+                   let qy = arguments!["qy"] as? Double,
+                   let qz = arguments!["qz"] as? Double,
+                   let qw = arguments!["qw"] as? Double {
+                    
+                    print("GeoAnchor: Received arguments: lat=\(lat), lon=\(lon), alt=\(alt), name=\(name), qx=\(qx), qy=\(qy), qz=\(qz), qw=\(qw)")
+
+                    guard let arcoreSession = self.arcoreSession else {
+                        print("GeoAnchor: arcoreSession is nil")
+                        result(FlutterError(code: "Error", message: "ARCore session not initialized", details: nil))
+                        return
+                    }
+
+                    guard let earth = latestGarFrame?.earth else {
+                        print("GeoAnchor: Earth not available")
+                        result(FlutterError(code: "Error", message: "ARCore Earth not available", details: nil))
+                        return
+                    }
+
+                    if earth.trackingState != .tracking {
+                        print("GeoAnchor: Earth not tracking — cannot create anchor")
+                        result(FlutterError(code: "Error", message: "Earth not tracking.", details: nil))
+                        return
+                    }
+
+                    if let cameraPose = earth.cameraGeospatialPose {
+                        print("GeoAnchor: Camera WGS84 Altitude: \(cameraPose.altitude)")
+                        print("GeoAnchor: Requested Anchor Altitude: \(alt)")
+                        print("GeoAnchor: Altitude Difference: \(alt - cameraPose.altitude)")
+                    }
+
+                    do {
+                        var coordinates = CLLocationCoordinate2D()
+                        coordinates.latitude = lat
+                        coordinates.longitude = lon
                         
-                        var coordinates = CLLocationCoordinate2D();
-                        coordinates.latitude = lat;
-                        coordinates.longitude = lon;
-                        
-                        let ganchor = try arcoreSession!.createAnchor(
+                        let ganchor = try arcoreSession.createAnchor(
                             coordinate: coordinates,
                             altitude: alt,
                             eastUpSouthQAnchor: simd_quatf(ix: Float(qx), iy: Float(qy), iz: Float(qz), r: Float(qw))
                         )
                         
-                        let newAnchor = ARAnchor(transform: ganchor.transform);
+                        let newAnchor = ARAnchor(transform: ganchor.transform)
                         self.sceneView.session.add(anchor: newAnchor)
                         self.anchorCollection[name] = newAnchor
-                        result(serializeGeospatialAnchor(anchor: newAnchor, anchorNode: nil, ganchor: ganchor, name: name, latitude: lat, longitude: lon, altitude: alt, qx: Float(qx), qy: Float(qy), qz: Float(qz), qw: Float(qw)));
-                    } else {
-                        result(nil)
+                        
+                        print("GeoAnchor: ✅ Node placed and stored with name: \(name)")
+                        
+                        let serialized = serializeGeospatialAnchor(
+                            anchor: newAnchor,
+                            anchorNode: nil,
+                            ganchor: ganchor,
+                            name: name,
+                            latitude: lat,
+                            longitude: lon,
+                            altitude: alt,
+                            qx: Float(qx),
+                            qy: Float(qy),
+                            qz: Float(qz),
+                            qw: Float(qw)
+                        )
+                        print("GeoAnchor: Sending serialized anchor data")
+                        result(serialized)
+                        print("GeoAnchor: placeGeospatial exited successfully.")
+                        
+                    } catch {
+                        print("GeoAnchor: Error adding geospatial anchor: \(error.localizedDescription)")
+                        result(FlutterError(code: "Error", message: "Failed to create geospatial anchor.", details: nil))
                     }
-                } catch {
-                    print(error)
-                    result(nil);
+                } else {
+                    print("GeoAnchor: Missing lat, long, alt, name or quaternion arguments.")
+                    result(FlutterError(code: "Error", message: "Missing arguments for geospatial anchor.", details: nil))
                 }
                 break;
             case "checkEarthTracking":
