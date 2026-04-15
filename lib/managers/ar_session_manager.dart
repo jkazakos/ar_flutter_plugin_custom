@@ -89,7 +89,7 @@ class ARSessionManager {
     } catch (e, stack) {
       print('❌ Error caught: $e');
       print('📌 Stack trace: $stack');
-      return null;
+      rethrow;
     }
   }
 
