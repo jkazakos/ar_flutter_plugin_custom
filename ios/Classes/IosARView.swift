@@ -355,6 +355,12 @@ class IosARView: NSObject, FlutterPlatformView, ARSCNViewDelegate, UIGestureReco
                         configuration.geospatialMode = .enabled;
                         arcoreSession?.setConfiguration(configuration, error: nil);
 
+                        // Apple ARKit config requires gravityAndHeading for Geospatial
+                        if self.configuration != nil {
+                            self.configuration.worldAlignment = .gravityAndHeading
+                            self.sceneView.session.run(self.configuration)
+                        }
+
                         arcoreMode = true
                         result(nil)
                     } catch {
