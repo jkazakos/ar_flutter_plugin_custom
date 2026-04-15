@@ -39,7 +39,7 @@ class ARAnchorManager {
 
   /// Activates collaborative AR mode (using Google Cloud Anchors)
   initGeoSpatialMode() async {
-    _channel.invokeMethod<bool>('initGeoSpatialMode', {});
+    _channel.invokeMethod<bool>('initGeospatialMode', {});
   }
 
   Future<dynamic> _platformCallHandler(MethodCall call) async {
