@@ -102,19 +102,19 @@ class IosARView: NSObject, FlutterPlatformView, ARSCNViewDelegate, UIGestureReco
                     print("GeoAnchor: Received arguments: lat=\(lat), lon=\(lon), alt=\(alt), name=\(name), qx=\(qx), qy=\(qy), qz=\(qz), qw=\(qw)")
 
                     guard let arcoreSession = self.arcoreSession else {
-                        print("GeoAnchor: arcoreSession is nil")
+                        self.sessionManagerChannel.invokeMethod("onError", arguments: ["iOS GeoAnchor: ARCore session not initialized"])
                         result(FlutterError(code: "Error", message: "ARCore session not initialized", details: nil))
                         return
                     }
 
                     guard let earth = latestGarFrame?.earth else {
-                        print("GeoAnchor: Earth not available")
+                        self.sessionManagerChannel.invokeMethod("onError", arguments: ["iOS GeoAnchor: ARCore Earth not available"])
                         result(FlutterError(code: "Error", message: "ARCore Earth not available", details: nil))
                         return
                     }
 
                     if earth.trackingState != .tracking {
-                        print("GeoAnchor: Earth not tracking — cannot create anchor")
+                        self.sessionManagerChannel.invokeMethod("onError", arguments: ["iOS GeoAnchor: Earth not tracking."])
                         result(FlutterError(code: "Error", message: "Earth not tracking.", details: nil))
                         return
                     }
@@ -160,7 +160,7 @@ class IosARView: NSObject, FlutterPlatformView, ARSCNViewDelegate, UIGestureReco
                         print("GeoAnchor: placeGeospatial exited successfully.")
                         
                     } catch {
-                        print("GeoAnchor: Error adding geospatial anchor: \(error.localizedDescription)")
+                        self.sessionManagerChannel.invokeMethod("onError", arguments: ["iOS GeoAnchor: Failed to create anchor. \(error.localizedDescription)"])
                         result(FlutterError(code: "Error", message: "Failed to create geospatial anchor.", details: nil))
                     }
                 } else {
