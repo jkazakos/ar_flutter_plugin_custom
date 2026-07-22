@@ -119,7 +119,7 @@ class IosARView: NSObject, FlutterPlatformView, ARSCNViewDelegate, UIGestureReco
                         return
                     }
 
-                    if let cameraPose = earth.cameraGeospatialPose {
+                    if let cameraPose = earth.cameraGeospatialTransform {
                         print("GeoAnchor: Camera WGS84 Altitude: \(cameraPose.altitude)")
                         print("GeoAnchor: Requested Anchor Altitude: \(alt)")
                         print("GeoAnchor: Altitude Difference: \(alt - cameraPose.altitude)")
@@ -320,6 +320,10 @@ class IosARView: NSObject, FlutterPlatformView, ARSCNViewDelegate, UIGestureReco
                         }
                         result(false)
                         break
+                    case 1: //Geospatial Anchor
+                        // Currently not called directly from Flutter (uses placeGeospatial instead)
+                        result(false)
+                        break
                     default:
                         result(false)
 
@@ -356,10 +360,12 @@ class IosARView: NSObject, FlutterPlatformView, ARSCNViewDelegate, UIGestureReco
                         arcoreSession?.setConfiguration(configuration, error: nil);
 
                         // Apple ARKit config requires gravityAndHeading for Geospatial
-                        if self.configuration != nil {
-                            self.configuration.worldAlignment = .gravityAndHeading
-                            self.sceneView.session.run(self.configuration)
+                        if self.configuration == nil {
+                            self.configuration = ARWorldTrackingConfiguration()
+                            self.configuration.environmentTexturing = .automatic
                         }
+                        self.configuration.worldAlignment = .gravityAndHeading
+                        self.sceneView.session.run(self.configuration, options: [])
 
                         arcoreMode = true
                         result(nil)

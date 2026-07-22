@@ -18,9 +18,9 @@ A Flutter plugin for shared AR experiences supporting Android and iOS.
   s.dependency 'GLTFSceneKit'
   s.dependency 'SwiftJWT'
   s.static_framework = true
-  s.dependency 'ARCore', '~> 1.37.0'
-  s.dependency 'ARCore/CloudAnchors', '~> 1.37.0'
-  s.dependency 'ARCore/Geospatial', '~> 1.37.0'
+  s.dependency 'ARCore', '>= 1.37.0'
+  s.dependency 'ARCore/CloudAnchors', '>= 1.37.0'
+  s.dependency 'ARCore/Geospatial', '>= 1.37.0'
   s.platform = :ios, '13.0'
 
 
