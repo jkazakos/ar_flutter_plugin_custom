@@ -33,15 +33,15 @@ internal class CloudAnchorHandler(arSession: Session) {
         ttl: Int
     ) {
         if (anchor == null) return
-        val callback = BiConsumer<String, CloudAnchorState> { cloudAnchorId, state ->
+        // cloudAnchorId is null when hosting fails
+        val callback = BiConsumer<String?, CloudAnchorState> { cloudAnchorId, state ->
             try {
                 Log.d(
                     TAG,
                     "State $state for $anchorName with id $cloudAnchorId"
                 )
-                if (state == CloudAnchorState.SUCCESS) {
-                    listener!!.onCloudTaskComplete(anchorName, anchor, state, cloudAnchorId)
-                }
+                // Report errors too, so the app isn't left waiting on a failed upload
+                listener?.onCloudTaskComplete(anchorName, anchor, state, cloudAnchorId ?: "")
             } catch (e: Exception) {
                 Log.d(TAG, e.toString())
             }
@@ -49,7 +49,8 @@ internal class CloudAnchorHandler(arSession: Session) {
         try {
             session.hostCloudAnchorAsync(anchor, ttl, callback)
         } catch (e: Exception) {
-            Log.d(TAG, e.toString())
+            Log.d(TAG, "Error calling hostCloudAnchorAsync: ${e.toString()}")
+            listener?.onCloudTaskComplete(anchorName, anchor, CloudAnchorState.ERROR_INTERNAL, "")
         }
     }
 

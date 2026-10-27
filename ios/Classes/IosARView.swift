@@ -900,7 +900,8 @@ class IosARView: NSObject, FlutterPlatformView, ARSCNViewDelegate, UIGestureReco
                 if (cloudState == GARCloudAnchorState.success) {
                     let newAnchor = ARAnchor(transform: anchor!.transform)
                     // Register new anchor on the Flutter side of the plugin
-                    parent.anchorManagerChannel.invokeMethod("onAnchorDownloadSuccess", arguments: serializeAnchor(anchor: newAnchor, anchorNode: nil, ganchor: anchor!, name: anchorName), result: { result in
+                    // Resolved anchors have no local name, so use the cloud ID like Android does
+                    parent.anchorManagerChannel.invokeMethod("onAnchorDownloadSuccess", arguments: serializeAnchor(anchor: newAnchor, anchorNode: nil, ganchor: anchor!, name: anchorName ?? anchor!.cloudIdentifier), result: { result in
                         if let anchorName = result as? String {
                             self.parent.sceneView.session.add(anchor: newAnchor)
                             self.parent.anchorCollection[anchorName] = newAnchor
