@@ -1,7 +1,5 @@
 import 'package:ar_flutter_plugin/datatypes/anchor_types.dart';
-import 'package:ar_flutter_plugin/models/ar_node.dart';
 import 'package:ar_flutter_plugin/utils/json_converters.dart';
-import 'package:vector_math/vector_math_64.dart';
 import 'package:flutter/widgets.dart';
 
 /// Object attached to a tracked physical entity of the AR environment (can be initialized with a world transformation)
@@ -61,8 +59,7 @@ class ARPlaneAnchor extends ARAnchor {
   /// Time to live of the anchor: Determines how long the anchor is stored once it is uploaded to the google cloud anchor API (optional, defaults to 1 day (24hours))
   int? ttl;
 
-  static ARPlaneAnchor fromJson(Map json) =>
-      aRPlaneAnchorFromJson(json);
+  static ARPlaneAnchor fromJson(Map json) => aRPlaneAnchorFromJson(json);
 
   @override
   Map<String, dynamic> toJson() => aRPlaneAnchorToJson(this);
@@ -97,7 +94,6 @@ Map<String, dynamic> aRPlaneAnchorToJson(ARPlaneAnchor instance) {
 
 /// An [ARAnchor] fixed to a real-world geospatial location
 class ARGeospatialAnchor extends ARAnchor {
-
   ARGeospatialAnchor({
     // Geospatial specific properties
     required this.latitude,
@@ -112,11 +108,11 @@ class ARGeospatialAnchor extends ARAnchor {
     List<String>? childNodes,
     String? cloudanchorid,
     int? ttl,
-  }) :  childNodes = childNodes ?? [],
+  })  : childNodes = childNodes ?? [],
         super(
-          type: AnchorType.geospatial,
-          transformation: transformation,
-          name: name);
+            type: AnchorType.geospatial,
+            transformation: transformation,
+            name: name);
 
   List<String> childNodes;
   String? cloudanchorid;
@@ -151,7 +147,8 @@ ARGeospatialAnchor aRGeospatialAnchorFromJson(Map json) {
     qy: (json['qy'] ?? 0.0) as double,
     qz: (json['qz'] ?? 0.0) as double,
     qw: (json['qw'] ?? 1.0) as double,
-    transformation: const MatrixConverter().fromJson(json['transformation'] as List),
+    transformation:
+        const MatrixConverter().fromJson(json['transformation'] as List),
     cloudanchorid: json['cloudanchorid'] as String?,
     ttl: json['ttl'] as int? ?? 1, // Default to 1 day if not provided
   );
@@ -159,7 +156,8 @@ ARGeospatialAnchor aRGeospatialAnchorFromJson(Map json) {
 
 /// Serializes an [ARGeospatialAnchor]
 Map<String, dynamic> aRGeospatialAnchorToJson(ARGeospatialAnchor instance) {
-  print("Called aRGeospatialAnchorToJson with type: ${instance.type}, name: ${instance.name}, latitude: ${instance.latitude}, longitude: ${instance.longitude}, altitude: ${instance.altitude}, qx: ${instance.qx}, qy: ${instance.qy}, qz: ${instance.qz}, qw: ${instance.qw}");
+  print(
+      "Called aRGeospatialAnchorToJson with type: ${instance.type}, name: ${instance.name}, latitude: ${instance.latitude}, longitude: ${instance.longitude}, altitude: ${instance.altitude}, qx: ${instance.qx}, qy: ${instance.qy}, qz: ${instance.qz}, qw: ${instance.qw}");
   return <String, dynamic>{
     'type': instance.type.index, // Use index for enum
     'name': instance.name,
@@ -171,7 +169,8 @@ Map<String, dynamic> aRGeospatialAnchorToJson(ARGeospatialAnchor instance) {
     'qy': instance.qy,
     'qz': instance.qz,
     'qw': instance.qw,
-    'transformation': MatrixConverter().toJson(instance.transformation), // Always serialize transformation
+    'transformation': MatrixConverter()
+        .toJson(instance.transformation), // Always serialize transformation
     'cloudanchorid': instance.cloudanchorid,
     'ttl': instance.ttl ?? 1, // Default to 1 day if not provided
   };
@@ -183,8 +182,7 @@ class ARUnkownAnchor extends ARAnchor {
       {required AnchorType type, required Matrix4 transformation, String? name})
       : super(type: type, transformation: transformation, name: name);
 
-  static ARUnkownAnchor fromJson(Map json) =>
-      aRUnkownAnchorFromJson(json);
+  static ARUnkownAnchor fromJson(Map json) => aRUnkownAnchorFromJson(json);
 
   @override
   Map<String, dynamic> toJson() => aRUnkownAnchorToJson(this);

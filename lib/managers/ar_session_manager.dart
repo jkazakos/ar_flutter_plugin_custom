@@ -1,5 +1,4 @@
 import 'dart:math' show sqrt;
-import 'dart:typed_data';
 
 import 'package:ar_flutter_plugin/datatypes/config_planedetection.dart';
 import 'package:ar_flutter_plugin/models/ar_anchor.dart';
@@ -31,7 +30,8 @@ class ARSessionManager {
   /// Receives hit results from user taps with tracked planes or feature points
   late ARHitResultHandler onPlaneOrPointTap;
 
-  ARSessionManager(int id, this.buildContext, this.planeDetectionConfig, {this.debug = false}) {
+  ARSessionManager(int id, this.buildContext, this.planeDetectionConfig,
+      {this.debug = false}) {
     _channel = MethodChannel('arsession_$id');
     _channel.setMethodCallHandler(_platformCallHandler);
     if (debug) {
@@ -42,7 +42,8 @@ class ARSessionManager {
   /// Returns the camera pose in Matrix4 format with respect to the world coordinate system of the [ARView]
   Future<Matrix4?> getCameraPose() async {
     try {
-      final serializedCameraPose = await _channel.invokeMethod<List<dynamic>>('getCameraPose', {});
+      final serializedCameraPose =
+          await _channel.invokeMethod<List<dynamic>>('getCameraPose', {});
       return MatrixConverter().fromJson(serializedCameraPose!);
     } catch (e) {
       print('Error caught: ' + e.toString());
@@ -53,7 +54,8 @@ class ARSessionManager {
   /// Places anchor in given 2D coordinates (starting from the top-left side of the screen)
   Future placeBasedOnScreenCoordinates(double x, double y) async {
     try {
-      return await _channel.invokeMethod<List<dynamic>>('placeBasedOnCoordinates', {"x": x, "y": y});
+      return await _channel.invokeMethod<List<dynamic>>(
+          'placeBasedOnCoordinates', {"x": x, "y": y});
     } catch (e) {
       print('Error caught: ' + e.toString());
       return null;
@@ -61,8 +63,10 @@ class ARSessionManager {
   }
 
   /// Places anchor in lat-lon-alt coordinates using GeoSpatial API
-  Future placeGeospatial(double? lat, double? lon, double? alt, String name, double qx, double qy, double qz, double qw) async {
-    print("Calling placeGeospatial with lat: $lat, lon: $lon, alt: $alt, name: $name, qx: $qx, qy: $qy, qz: $qz, qw: $qw");
+  Future placeGeospatial(double? lat, double? lon, double? alt, String name,
+      double qx, double qy, double qz, double qw) async {
+    print(
+        "Calling placeGeospatial with lat: $lat, lon: $lon, alt: $alt, name: $name, qx: $qx, qy: $qy, qz: $qz, qw: $qw");
     // if (lat ==null || lon == null || alt == null) {
     //   print("❌ Error: Latitude, Longitude, and Altitude must not be null.");
     //   return null;
@@ -99,7 +103,8 @@ class ARSessionManager {
       if (anchor.name.isEmpty) {
         throw Exception("Anchor can not be resolved. Anchor name is empty.");
       }
-      final serializedCameraPose = await _channel.invokeMethod<List<dynamic>>('getAnchorPose', {
+      final serializedCameraPose =
+          await _channel.invokeMethod<List<dynamic>>('getAnchorPose', {
         "anchorId": anchor.name,
       });
       return MatrixConverter().fromJson(serializedCameraPose!);
@@ -110,7 +115,8 @@ class ARSessionManager {
   }
 
   /// Returns the distance in meters between @anchor1 and @anchor2.
-  Future<double?> getDistanceBetweenAnchors(ARAnchor anchor1, ARAnchor anchor2) async {
+  Future<double?> getDistanceBetweenAnchors(
+      ARAnchor anchor1, ARAnchor anchor2) async {
     var anchor1Pose = await getPose(anchor1);
     var anchor2Pose = await getPose(anchor2);
     var anchor1Translation = anchor1Pose?.getTranslation();
@@ -151,21 +157,19 @@ class ARSessionManager {
     try {
       switch (call.method) {
         case 'onError':
-          if (onError != null) {
-            onError(call.arguments[0]);
-            print(call.arguments);
-          }
+          onError(call.arguments[0]);
+          print(call.arguments);
           break;
         case 'onPlaneOrPointTap':
-          if (onPlaneOrPointTap != null) {
-            final rawHitTestResults = call.arguments as List<dynamic>;
-            final serializedHitTestResults =
-                rawHitTestResults.map((hitTestResult) => Map<String, dynamic>.from(hitTestResult)).toList();
-            final hitTestResults = serializedHitTestResults.map((e) {
-              return ARHitTestResult.fromJson(e);
-            }).toList();
-            onPlaneOrPointTap(hitTestResults);
-          }
+          final rawHitTestResults = call.arguments as List<dynamic>;
+          final serializedHitTestResults = rawHitTestResults
+              .map((hitTestResult) => Map<String, dynamic>.from(hitTestResult))
+              .toList();
+          final hitTestResults = serializedHitTestResults.map((e) {
+            return ARHitTestResult.fromJson(e);
+          }).toList();
+          onPlaneOrPointTap(hitTestResults);
+
           break;
         case 'dispose':
           _channel.invokeMethod<void>("dispose");
@@ -211,7 +215,10 @@ class ARSessionManager {
   onError(String errorMessage) {
     ScaffoldMessenger.of(buildContext).showSnackBar(SnackBar(
         content: Text(errorMessage),
-        action: SnackBarAction(label: 'HIDE', onPressed: ScaffoldMessenger.of(buildContext).hideCurrentSnackBar)));
+        action: SnackBarAction(
+            label: 'HIDE',
+            onPressed:
+                ScaffoldMessenger.of(buildContext).hideCurrentSnackBar)));
   }
 
   /// Dispose the AR view on the platforms to pause the scenes and disconnect the platform handlers.
@@ -231,16 +238,18 @@ class ARSessionManager {
     return MemoryImage(result!);
   }
 
-  /// NEW METHOD: Query the current Earth tracking state from the AR session
+  /// Queries the current Earth tracking state from the AR session
   Future<Map<String, String>> checkEarthTracking() async {
     try {
-      final Map<dynamic, dynamic>? resultMap = await _channel.invokeMethod('checkEarthTracking');
+      final Map<dynamic, dynamic>? resultMap =
+          await _channel.invokeMethod('checkEarthTracking');
 
       if (resultMap == null) {
         throw Exception("No result returned from checkEarthTracking");
       }
 
-      return resultMap.map((key, value) => MapEntry(key.toString(), value.toString()));
+      return resultMap
+          .map((key, value) => MapEntry(key.toString(), value.toString()));
     } catch (e) {
       debugPrint("Error checking Earth status: $e");
       return {
@@ -250,8 +259,11 @@ class ARSessionManager {
     }
   }
 
-  /// NEW METHOD: Sets the look direction of a node in the AR scene.
-  Future<void> setNodeLookDirection({required String anchorId, required Vector3 direction,}) async {
+  /// Sets the look direction of a node in the AR scene.
+  Future<void> setNodeLookDirection({
+    required String anchorId,
+    required Vector3 direction,
+  }) async {
     try {
       await _channel.invokeMethod('setNodeLookDirection', {
         'anchorId': anchorId,
@@ -261,5 +273,4 @@ class ARSessionManager {
       debugPrint("Error setting node look direction: $e");
     }
   }
-
 }

@@ -1,11 +1,7 @@
-import 'dart:typed_data';
-
-import 'package:ar_flutter_plugin/datatypes/anchor_types.dart';
 import 'package:ar_flutter_plugin/models/ar_anchor.dart';
 import 'package:ar_flutter_plugin/models/ar_node.dart';
 import 'package:ar_flutter_plugin/utils/json_converters.dart';
 import 'package:flutter/services.dart';
-import 'package:vector_math/vector_math_64.dart';
 
 // Type definitions to enforce a consistent use of the API
 typedef NodeTapResultHandler = void Function(List<String> nodes);
@@ -127,17 +123,19 @@ class ARObjectManager {
         _channel.invokeMethod<void>('transformationChanged', {
           'name': node.name,
           'transformation':
-          MatrixValueNotifierConverter().toJson(node.transformNotifier)
+              MatrixValueNotifierConverter().toJson(node.transformNotifier)
         });
       });
 
       if (anchor is ARPlaneAnchor) {
         // Case 1: Anchor is an ARPlaneAnchor
-        anchor.childNodes.add(node.name); // Update Dart-side anchor's children list
+        anchor.childNodes
+            .add(node.name); // Update Dart-side anchor's children list
         return await _channel.invokeMethod<bool>('addNodeToPlaneAnchor',
             {'node': node.toMap(), 'anchor': anchor.toJson()});
       } else if (anchor is ARGeospatialAnchor) {
-        print('Now going to call addNodeToGeospatialAnchor with anchor: ${anchor.toJson()}');
+        print(
+            'Now going to call addNodeToGeospatialAnchor with anchor: ${anchor.toJson()}');
         // Case 2: Anchor is an ARGeospatialAnchor
         return await _channel.invokeMethod<bool>('addNodeToGeospatialAnchor',
             {'node': node.toMap(), 'anchor': anchor.toJson()});
